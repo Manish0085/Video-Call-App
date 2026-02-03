@@ -7,11 +7,11 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [incomingCall, setIncomingCall] = useState(null);
   const [outgoingCall, setOutgoingCall] = useState(null);
-  const [messages, setMessages] = useState({}); // { strangerId: [{text, fromMe, time}] }
-  const [activeChat, setActiveChat] = useState(null); // strangerId
+  const [messages, setMessages] = useState({});
+  const [activeChat, setActiveChat] = useState(null);
   const [chatInput, setChatInput] = useState("");
   const navigate = useNavigate();
-  const { authUser } = useAuth();
+  const { authUser, logout } = useAuth();
 
   const chatEndRef = useRef(null);
 
@@ -81,15 +81,7 @@ export default function Users() {
     setChatInput("");
   };
 
-  const getActiveUserName = () => {
-    const user = users.find(([id]) => id === activeChat);
-    return user ? user[1].fullName : "Stranger";
-  };
-
-  const getActiveUserPic = () => {
-    const user = users.find(([id]) => id === activeChat);
-    return user ? user[1].profilePic : "";
-  };
+  const activeUser = users.find(([id]) => id === activeChat)?.[1];
 
   const handleAccept = () => {
     socket.emit("accept-call", { targetId: incomingCall.from });
@@ -103,191 +95,233 @@ export default function Users() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex relative overflow-hidden">
-      {/* Main Content */}
-      <div className={`flex-1 p-8 transition-all duration-300 ${activeChat ? 'mr-[400px]' : ''}`}>
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center mb-10 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-4">
-              <Link to="/profile" className="w-14 h-14 bg-blue-100 rounded-2xl overflow-hidden flex items-center justify-center hover:scale-105 transition-all ring-2 ring-blue-500/20">
-                {authUser?.profilePic ? (
-                  <img src={authUser.profilePic} alt="Me" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xl font-bold text-blue-600">{authUser?.fullName[0]}</span>
-                )}
-              </Link>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 leading-tight">Welcome, {authUser?.fullName}</h2>
-                <p className="text-xs font-bold text-green-500 uppercase tracking-widest mt-0.5">Ready for calls</p>
-              </div>
+    <div className="min-h-screen bg-[#FDFDFF] flex overflow-hidden font-sans">
+      {/* Sidebar */}
+      <aside className="w-80 glass-dark text-white flex flex-col z-20">
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-indigo-500/20">
+              💎
             </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  const roomName = prompt("Enter Group Name:");
-                  if (roomName) socket.emit("create-room", { roomName });
-                }}
-                className="bg-blue-600 text-white px-5 py-2.5 rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2 text-sm"
-              >
-                <span>👪</span> Create Group
-              </button>
-              <button
-                onClick={() => {
-                  const roomId = prompt("Enter Room ID:");
-                  if (roomId) navigate(`/group/${roomId}`);
-                }}
-                className="bg-white text-gray-700 border border-gray-200 px-5 py-2.5 rounded-2xl font-bold hover:bg-gray-50 transition-all text-sm"
-              >
-                Join Room
-              </button>
-            </div>
+            <h1 className="text-2xl font-black tracking-tighter">Lumina</h1>
           </div>
 
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-[0.2em] mb-6 px-1">Active Now</h3>
+          <div className="space-y-1">
+            <Link to="/profile" className="flex items-center gap-4 p-4 hover:bg-white/5 rounded-2xl transition-all group">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-indigo-500/30 group-hover:border-indigo-500 transition-all">
+                {authUser?.profilePic ? (
+                  <img src={authUser.profilePic} className="w-full h-full object-cover" alt="Profile" />
+                ) : (
+                  <div className="w-full h-full bg-indigo-600 flex items-center justify-center font-bold">
+                    {authUser?.fullName[0]}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-sm truncate max-w-[120px]">{authUser?.fullName}</p>
+                <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Premium User</p>
+              </div>
+            </Link>
+          </div>
+        </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+        <nav className="flex-1 px-4 space-y-2">
+          <button className="w-full flex items-center gap-4 p-4 bg-indigo-600/10 text-indigo-400 rounded-2xl border border-indigo-500/20">
+            <span className="text-xl">🏠</span>
+            <span className="font-bold text-sm">Dashboard</span>
+          </button>
+          <button
+            onClick={() => {
+              const roomName = prompt("Enter Group Name:");
+              if (roomName) socket.emit("create-room", { roomName });
+            }}
+            className="w-full flex items-center gap-4 p-4 hover:bg-white/5 text-slate-400 rounded-2xl transition-all"
+          >
+            <span className="text-xl">👥</span>
+            <span className="font-bold text-sm">Groups</span>
+          </button>
+        </nav>
+
+        <div className="p-8">
+          <button
+            onClick={logout}
+            className="w-full py-4 bg-white/5 hover:bg-red-500/10 text-red-500 rounded-2xl font-bold text-sm border border-white/5 transition-all"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-10 relative">
+        <div className="max-w-6xl mx-auto">
+          <header className="flex justify-between items-end mb-12">
+            <div>
+              <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">Active Peers</h2>
+              <p className="text-slate-500 font-medium mt-2">Connect with {users.length - 1} people online</p>
+            </div>
+
+            <button
+              onClick={() => {
+                const roomId = prompt("Enter Room ID:");
+                if (roomId) navigate(`/group/${roomId}`);
+              }}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <span>🔑</span> Join Private Room
+            </button>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {!socket.connected ? (
-              <div className="col-span-full py-20 text-center text-gray-400">Connecting...</div>
+              <div className="col-span-full py-20 text-center animate-pulse text-indigo-500 font-bold">
+                Handshaking with server...
+              </div>
             ) : users.length <= 1 ? (
-              <div className="col-span-full py-20 text-center text-gray-500 bg-white rounded-3xl border border-dashed border-gray-300">
-                <div className="text-4xl mb-2">🔭</div>
-                <p className="font-medium">No other users online right now</p>
+              <div className="col-span-full py-32 glass rounded-[3rem] text-center border-dashed border-2 border-slate-200">
+                <div className="text-6xl mb-6">🏜️</div>
+                <h3 className="text-2xl font-black text-slate-900">It's quiet here</h3>
+                <p className="text-slate-500 mt-2 font-medium">Wait for others to join the network</p>
               </div>
             ) : (
               users.map(([id, user]) =>
-                id !== socket.id ? (
-                  <div key={id} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all group">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-blue-50 rounded-[1.4rem] overflow-hidden flex items-center justify-center border-2 border-white group-hover:scale-110 transition-transform shadow-sm">
+                id !== socket.id && (
+                  <div key={id} className="card group hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300">
+                    <div className="flex justify-between items-start mb-8">
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-[1.8rem] overflow-hidden border-4 border-white shadow-xl group-hover:scale-110 transition-all duration-500">
                           {user.profilePic ? (
                             <img src={user.profilePic} alt={user.fullName} className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-2xl font-bold text-blue-600">{user.fullName[0]}</span>
+                            <div className="w-full h-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl font-bold">
+                              {user.fullName[0]}
+                            </div>
                           )}
                         </div>
-                        <div>
-                          <p className="font-extrabold text-gray-900 text-lg leading-tight">{user.fullName}</p>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <div className={`w-2 h-2 rounded-full ${user.status === "idle" ? "bg-green-500" : "bg-amber-500"}`}></div>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                              {user.status}
-                            </span>
-                          </div>
-                        </div>
+                        <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 border-white ${user.status === 'idle' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}></div>
                       </div>
+
                       {messages[id]?.length > 0 && !messages[id][messages[id].length - 1].fromMe && (
-                        <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-sm animate-bounce"></div>
+                        <div className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-black rounded-full shadow-lg shadow-indigo-600/20 animate-bounce">
+                          NEW
+                        </div>
                       )}
                     </div>
 
-                    <div className="flex gap-3">
+                    <h4 className="text-xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">{user.fullName}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 mb-8">
+                      {user.status === 'idle' ? 'Available' : 'Currently Busy'}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
                       <button
-                        onClick={() => {
-                          if (user.status !== "idle") return;
-                          socket.emit("call-user", { targetId: id });
-                        }}
+                        onClick={() => socket.emit("call-user", { targetId: id })}
                         disabled={user.status !== "idle"}
-                        className="flex-1 bg-neutral-900 text-white font-bold py-3 rounded-2xl hover:bg-black disabled:bg-gray-100 disabled:text-gray-400 transition-all flex items-center justify-center gap-2"
+                        className="btn-primary flex items-center justify-center gap-2 py-3 px-4 text-xs disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                       >
                         📹 {user.status !== "idle" ? "Busy" : "Call"}
                       </button>
                       <button
                         onClick={() => setActiveChat(id)}
-                        className={`px-6 py-3 rounded-2xl font-bold transition-all ${activeChat === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                        className={`btn-secondary py-3 px-4 text-xs font-bold ${activeChat === id ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : ''}`}
                       >
                         💬 Chat
                       </button>
                     </div>
                   </div>
-                ) : null
+                )
               )
             )}
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* WhatsApp style Chat Panel */}
-      <div className={`fixed top-0 right-0 h-full w-[400px] bg-white border-l shadow-2xl transition-transform duration-300 transform ${activeChat ? 'translate-x-0' : 'translate-x-full'} z-10 flex flex-col`}>
-        {activeChat && (
+      {/* Modern Chat Drawer */}
+      <div className={`fixed top-6 right-6 bottom-6 w-[420px] glass rounded-[2.5rem] shadow-2xl transition-all duration-500 transform ${activeChat ? 'translate-x-0 opacity-100' : 'translate-x-[110%] opacity-0'} z-30 flex flex-col border border-white/40 shadow-indigo-500/10`}>
+        {activeChat && activeUser && (
           <>
-            {/* Chat Header */}
-            <div className="p-5 bg-white border-b flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-2xl overflow-hidden flex items-center justify-center font-bold">
-                  {getActiveUserPic() ? (
-                    <img src={getActiveUserPic()} alt="User" className="w-full h-full object-cover" />
+            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md">
+                  {activeUser.profilePic ? (
+                    <img src={activeUser.profilePic} alt="User" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-xl text-blue-600">{getActiveUserName()[0]}</span>
+                    <div className="w-full h-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                      {activeUser.fullName[0]}
+                    </div>
                   )}
                 </div>
                 <div>
-                  <p className="font-extrabold text-gray-900">{getActiveUserName()}</p>
-                  <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Active Chat</p>
+                  <h3 className="font-extrabold text-slate-900 leading-none">{activeUser.fullName}</h3>
+                  <span className="text-[10px] font-black text-green-500 uppercase tracking-widest mt-1 inline-block">Online</span>
                 </div>
               </div>
-              <button onClick={() => setActiveChat(null)} className="hover:bg-gray-100 w-10 h-10 flex items-center justify-center rounded-2xl text-gray-400 transition-colors">✕</button>
+              <button onClick={() => setActiveChat(null)} className="w-10 h-10 hover:bg-slate-50 rounded-2xl flex items-center justify-center transition-colors text-slate-400 font-bold">✕</button>
             </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#f8f9fb]">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/30">
               {(messages[activeChat] || []).map((msg, i) => (
                 <div key={i} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl shadow-sm text-sm ${msg.fromMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'}`}>
+                  <div className={`max-w-[85%] px-5 py-3 rounded-3xl shadow-sm text-sm font-medium ${msg.fromMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'}`}>
                     {msg.text}
-                    <p className={`text-[9px] mt-1.5 ${msg.fromMe ? 'text-blue-100' : 'text-gray-400'}`}>
+                    <div className={`text-[9px] mt-2 font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
                       {new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    </div>
                   </div>
                 </div>
               ))}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Chat Input */}
-            <form onSubmit={handleSendMessage} className="p-6 bg-white border-t flex gap-3">
+            <form onSubmit={handleSendMessage} className="p-8 bg-white/50 backdrop-blur-md rounded-b-[2.5rem] border-t border-slate-100 flex gap-4">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Write a message..."
-                className="flex-1 px-5 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none transition-all placeholder:text-gray-400"
+                placeholder="Compose message..."
+                className="input-field border-transparent shadow-inner"
               />
-              <button type="submit" className="bg-blue-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
-                ➤
+              <button type="submit" className="w-14 h-14 btn-primary p-0 flex items-center justify-center text-xl">
+                🚀
               </button>
             </form>
           </>
         )}
       </div>
 
-      {/* Call Modal Modals */}
+      {/* Enhanced Call Alerts */}
       {incomingCall && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-300">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-[2rem] flex items-center justify-center text-4xl font-bold mb-6 animate-pulse ring-8 ring-blue-50">
-                {incomingCall.fromName[0].toUpperCase()}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-[3.5rem] p-12 max-w-sm w-full shadow-2xl text-center border border-white/20">
+            <div className="relative w-32 h-32 mx-auto mb-8">
+              <div className="absolute inset-0 bg-indigo-500 rounded-[2.5rem] animate-ping opacity-20"></div>
+              <div className="relative w-full h-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white rounded-[2.5rem] flex items-center justify-center text-5xl font-bold shadow-2xl">
+                {incomingCall.fromName[0]}
               </div>
-              <h3 className="text-3xl font-black text-gray-900 mb-2">Incoming Call</h3>
-              <p className="text-gray-500 mb-10 font-medium">{incomingCall.fromName} wants to video chat</p>
+            </div>
 
-              <div className="flex gap-4 w-full">
-                <button onClick={handleDecline} className="flex-1 bg-red-50 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-100 transition-colors">Decline</button>
-                <button onClick={handleAccept} className="flex-1 bg-green-500 text-white font-bold py-4 rounded-2xl hover:bg-green-600 shadow-lg shadow-green-200 transition-all active:scale-95">Accept</button>
-              </div>
+            <h3 className="text-3xl font-black text-slate-900 leading-tight">Incoming Call</h3>
+            <p className="text-slate-500 mt-3 font-semibold mb-10">{incomingCall.fromName} wants to connect</p>
+
+            <div className="flex gap-4">
+              <button onClick={handleDecline} className="flex-1 py-5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-2xl font-black transition-all">Decline</button>
+              <button onClick={handleAccept} className="flex-1 py-5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black shadow-xl shadow-green-500/20 transition-all active:scale-95">Accept</button>
             </div>
           </div>
         </div>
       )}
 
       {outgoingCall && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40">
-          <div className="bg-white/90 backdrop-blur-lg px-10 py-8 rounded-[2.5rem] flex flex-col items-center shadow-xl">
-            <div className="w-16 h-16 rounded-[1.5rem] border-4 border-blue-600/20 border-t-blue-600 animate-spin mb-6"></div>
-            <p className="text-2xl font-black text-gray-900">Calling...</p>
-            <button onClick={() => { socket.emit("reject-call", { targetId: outgoingCall }); setOutgoingCall(null); }} className="mt-8 text-red-600 font-bold hover:underline tracking-wide uppercase text-xs">End Attempt</button>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-40">
+          <div className="glass px-12 py-10 rounded-[3rem] flex flex-col items-center">
+            <div className="w-20 h-20 rounded-full border-4 border-indigo-500/20 border-t-indigo-600 animate-spin mb-8"></div>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">Ringing Peer...</p>
+            <button
+              onClick={() => { socket.emit("reject-call", { targetId: outgoingCall }); setOutgoingCall(null); }}
+              className="mt-10 px-6 py-2 bg-red-50 text-red-600 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+            >
+              Cancel Call
+            </button>
           </div>
         </div>
       )}

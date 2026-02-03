@@ -25,7 +25,6 @@ export default function Call() {
       streamRef.current.getTracks().forEach(track => {
         track.enabled = false;
         track.stop();
-        console.log(`Explicitly stopped ${track.kind} track`);
       });
       streamRef.current = null;
     }
@@ -36,13 +35,9 @@ export default function Call() {
   useEffect(() => {
     let mounted = true;
 
-    // Guard: Check if target is actually available/partnered
     socket.emit("get-users");
     const handleInitialCheck = (usersArray) => {
       const target = usersArray.find(([uid]) => uid === id);
-      const me = usersArray.find(([uid]) => uid === socket.id);
-
-      // If target is already on call with someone else, kick me out
       if (target && target[1].status === "on-call" && target[1].partnerId !== socket.id) {
         alert("This user is currently on another call.");
         navigate("/users");
@@ -57,7 +52,25 @@ export default function Call() {
     window.addEventListener("beforeunload", handleUnload);
 
     pc.current = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        {
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443",
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443?transport=tcp",
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        }
+      ],
     });
 
     pc.current.ontrack = (e) => {
@@ -78,11 +91,6 @@ export default function Call() {
 
     const socketOfferHandler = async ({ from, offer }) => {
       if (from !== id || !mounted) return;
-      // Handle glare: if we're both offering, smaller ID backs off
-      if (pc.current.signalingState !== "stable" && pc.current.signalingState !== "have-local-offer") {
-        console.log("Offer received in non-idle state:", pc.current.signalingState);
-      }
-
       await pc.current.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.current.createAnswer();
       await pc.current.setLocalDescription(answer);
@@ -91,10 +99,7 @@ export default function Call() {
 
     const socketAnswerHandler = async ({ answer }) => {
       if (!mounted) return;
-      if (pc.current.signalingState !== "have-local-offer") {
-        console.warn("Received answer while not in have-local-offer state:", pc.current.signalingState);
-        return;
-      }
+      if (pc.current.signalingState !== "have-local-offer") return;
       await pc.current.setRemoteDescription(new RTCSessionDescription(answer));
     };
 
@@ -102,9 +107,7 @@ export default function Call() {
       if (!mounted) return;
       try {
         await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {
-        // Ignore candidates if remote description isn't set yet
-      }
+      } catch (e) { }
     };
 
     socket.on("offer", socketOfferHandler);
@@ -122,18 +125,9 @@ export default function Call() {
           return;
         }
         streamRef.current = stream;
-        if (localRef.current) {
-          localRef.current.srcObject = stream;
-        }
+        if (localRef.current) localRef.current.srcObject = stream;
         stream.getTracks().forEach((t) => pc.current.addTrack(t, stream));
-        // Deterministic start: only one peer initiates to avoid glare
-        // Check if I am the initiator based on Socket ID comparison
-        if (socket.id < id) {
-          console.log("Initiating P2P call...");
-          startCall();
-        } else {
-          console.log("Waiting for peer to initiate...");
-        }
+        if (socket.id < id) startCall();
       })
       .catch(err => {
         console.error("Media error:", err);
@@ -156,10 +150,7 @@ export default function Call() {
       socket.off("users-update", handleInitialCheck);
       window.removeEventListener("beforeunload", handleUnload);
       stopMedia();
-      if (pc.current) {
-        pc.current.close();
-        pc.current = null;
-      }
+      if (pc.current) pc.current.close();
     };
   }, [id]);
 
@@ -180,71 +171,79 @@ export default function Call() {
   };
 
   return (
-    <div className="h-screen bg-neutral-950 flex flex-col items-center justify-center relative overflow-hidden text-white">
-      <div className="w-full h-full relative group">
+    <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden text-white">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/30 rounded-full blur-[120px]"></div>
+      </div>
+
+      <div className="w-full h-full relative z-10">
         <video
           ref={remoteRef}
           autoPlay
           playsInline
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover transition-opacity duration-1000 ${isCalling ? 'opacity-0' : 'opacity-100'}`}
         />
 
         {isCalling && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-900/80 backdrop-blur-sm">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center text-2xl font-bold">
-                📞
-              </div>
-            </div>
-            <p className="mt-6 text-xl font-medium animate-pulse text-blue-400">
-              Connecting to peer...
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md">
+            <div className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+            <p className="mt-10 text-2xl font-black tracking-tight animate-pulse text-indigo-400">
+              Securing Connection...
             </p>
           </div>
         )}
 
-        <div className="absolute top-6 right-6 w-48 h-32 md:w-64 md:h-44 rounded-2xl overflow-hidden border-2 border-white/10 shadow-2xl transition-transform hover:scale-105">
+        {/* Local Preview - Pinned Top Right */}
+        <div className="absolute top-8 right-8 w-56 h-36 md:w-72 md:h-48 rounded-3xl overflow-hidden border-2 border-white/10 shadow-2xl glass transition-all hover:scale-105 group">
           <video
             ref={localRef}
             autoPlay
             muted
             playsInline
-            className={`w-full h-full object-cover ${isVideoOff ? 'hidden' : ''}`}
+            className={`w-full h-full object-cover mirror ${isVideoOff ? 'hidden' : ''}`}
           />
           {isVideoOff && (
-            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-4xl">
+            <div className="w-full h-full bg-slate-800 flex items-center justify-center text-4xl">
               👤
             </div>
           )}
-          <div className="absolute bottom-2 left-2 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-white/10">
+          <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest border border-white/10">
             You {isMuted && '• Muted'}
           </div>
         </div>
 
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-6 px-8 py-4 bg-neutral-900/60 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl transition-all hover:bg-neutral-900/80">
+        {/* Control Bar - Centered Bottom */}
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-6 px-10 py-5 glass-dark rounded-[2.5rem] border border-white/10 shadow-2xl">
           <button
             onClick={toggleMic}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-neutral-800 text-gray-300 hover:bg-neutral-700'
-              }`}
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'}`}
           >
-            {isMuted ? '🎙️' : '🎤'}
+            {isMuted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 3l18 18" /></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+            )}
           </button>
 
           <button
             onClick={toggleVideo}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-500 text-white' : 'bg-neutral-800 text-gray-300 hover:bg-neutral-700'
-              }`}
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'}`}
           >
-            {isVideoOff ? '📵' : '🎥'}
+            {isVideoOff ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 3l18 18" /></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            )}
           </button>
 
-          <div className="w-[1px] h-8 bg-white/10 mx-2"></div>
+          <div className="w-[1px] h-10 bg-white/10 mx-2"></div>
 
           <button
             onClick={handleExit}
-            className="w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-2xl shadow-lg shadow-red-900/40 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+            className="w-16 h-16 bg-red-600 hover:bg-red-700 text-white rounded-[1.5rem] shadow-2xl shadow-red-900/40 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
           >
-            <span className="text-2xl rotate-[135deg]">📞</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 rotate-[135deg]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" /></svg>
           </button>
         </div>
       </div>

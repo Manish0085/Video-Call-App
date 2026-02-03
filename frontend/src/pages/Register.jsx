@@ -26,60 +26,64 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden">
-                <div className="p-8">
+        <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Decorative Background Elements */}
+            <div className="absolute top-[-5%] left-[-5%] w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-[-5%] right-[-5%] w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+
+            <div className="max-w-xl w-full glass rounded-[2.5rem] overflow-hidden shadow-2xl">
+                <div className="p-10">
                     <div className="text-center mb-10">
-                        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl mx-auto mb-4 shadow-lg">
-                            👤
+                        <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-3xl flex items-center justify-center text-white text-4xl mx-auto mb-6 shadow-xl shadow-indigo-200">
+                            👋
                         </div>
-                        <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
-                        <p className="text-gray-500 mt-2">Join the video call platform</p>
+                        <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">Create Account</h2>
+                        <p className="text-slate-500 mt-3 font-medium">Join the next-gen communication platform</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700 ml-1">Full Name</label>
                             <input
                                 type="text"
                                 required
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                className="input-field"
                                 placeholder="John Doe"
                                 value={formData.fullName}
                                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700 ml-1">Phone Number</label>
                             <input
                                 type="tel"
                                 required
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                className="input-field"
                                 placeholder="1234567890"
                                 value={formData.phoneNumber}
                                 onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Profile Picture URL</label>
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-sm font-bold text-slate-700 ml-1">Profile Picture URL</label>
                             <input
                                 type="text"
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                placeholder="https://example.com/pic.jpg"
+                                className="input-field"
+                                placeholder="https://images.unsplash.com/photo-..."
                                 value={formData.profilePic}
                                 onChange={(e) => setFormData({ ...formData, profilePic: e.target.value })}
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
                             <input
                                 type="password"
                                 required
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                placeholder="••••••••"
+                                className="input-field"
+                                placeholder="Minimum 6 characters"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             />
@@ -87,16 +91,23 @@ export default function Register() {
 
                         <button
                             disabled={loading}
-                            className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
+                            className="md:col-span-2 btn-primary mt-4 disabled:opacity-50"
                         >
-                            {loading ? "Creating Account..." : "Sign Up"}
+                            {loading ? (
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    <span>Creating Account...</span>
+                                </div>
+                            ) : (
+                                "Get Started"
+                            )}
                         </button>
                     </form>
 
-                    <p className="text-center mt-8 text-gray-600 font-medium">
+                    <p className="text-center mt-10 text-slate-600 font-medium">
                         Already have an account?{" "}
-                        <Link to="/login" className="text-blue-600 hover:underline">
-                            Log In
+                        <Link to="/login" className="text-indigo-600 font-bold hover:underline">
+                            Sign In
                         </Link>
                     </p>
                 </div>

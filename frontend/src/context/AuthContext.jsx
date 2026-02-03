@@ -6,7 +6,9 @@ const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 // Base URL for API
-const API_URL = "http://localhost:8000/api/auth";
+// Base URL for API - automatically detects host for cross-network support
+const API_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:8000`;
+const API_URL = `${API_BASE}/api/auth`;
 axios.defaults.withCredentials = true;
 
 export const AuthProvider = ({ children }) => {

@@ -13,8 +13,9 @@ function AppContent() {
 
   if (isCheckingAuth) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-16 h-16 border-4 border-indigo-600/20 border-t-indigo-600 rounded-[2rem] animate-spin mb-4"></div>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em] animate-pulse">Lumina initializing</p>
       </div>
     );
   }

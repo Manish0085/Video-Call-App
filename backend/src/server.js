@@ -14,14 +14,38 @@ const server = http.createServer(app);
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Dynamic CORS for cross-network dev / production
 app.use(cors({
-  origin: "http://localhost:5173", // Vite default
+  origin: (origin, callback) => {
+    // Allow all origins in development for cross-network testing (e.g. mobile)
+    // In production, you would restrict this to process.env.FRONTEND_URL
+    if (!origin || process.env.NODE_ENV === "development") {
+      callback(null, true);
+    } else {
+      if (origin === process.env.FRONTEND_URL) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
   credentials: true
 }));
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin || process.env.NODE_ENV === "development") {
+        callback(null, true);
+      } else {
+        if (origin === process.env.FRONTEND_URL) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    },
     credentials: true
   }
 });

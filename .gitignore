@@ -1,3 +1,4 @@
 signaling-server/
 docs/
 webRTC-Core/
+backend/.env frontend/.env

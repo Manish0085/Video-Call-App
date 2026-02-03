@@ -16,18 +16,25 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Dynamic CORS for cross-network dev / production
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow all origins in development for cross-network testing (e.g. mobile)
-    // In production, you would restrict this to process.env.FRONTEND_URL
-    if (!origin || process.env.NODE_ENV === "development") {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    // In development, allow all origins
+    if (process.env.NODE_ENV === "development") return callback(null, true);
+
+    // In production, check against allowed origins
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      if (origin === process.env.FRONTEND_URL) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
@@ -36,14 +43,12 @@ app.use(cors({
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || process.env.NODE_ENV === "development") {
+      if (!origin) return callback(null, true);
+      if (process.env.NODE_ENV === "development") return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        if (origin === process.env.FRONTEND_URL) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
+        callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true

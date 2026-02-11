@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { socket } from "../socket";
+import VideoTile from "../components/video/VideoTile";
+import { Copy, PhoneOff, Users } from "lucide-react";
 
 export default function GroupCall() {
     const { roomId } = useParams();
     const navigate = useNavigate();
     const [peers, setPeers] = useState({}); // { socketId: { stream } }
     const [localStream, setLocalStream] = useState(null);
-    const localVideoRef = useRef();
-
-    const pcs = useRef({});
     const streamRef = useRef(null);
+    const pcs = useRef({});
 
     useEffect(() => {
         let mounted = true;
@@ -25,7 +25,6 @@ export default function GroupCall() {
                 }
                 streamRef.current = stream;
                 setLocalStream(stream);
-                if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
                 console.log("Group: Joining room:", roomId);
                 socket.emit("join-room", { roomId });
@@ -38,13 +37,9 @@ export default function GroupCall() {
 
         init();
 
-        // DETERMINISTIC MESH HANDSHAKE (Lexicographical ID comparison)
-        // Ensures exactly one offer per pair of users.
-
         socket.on("room-joined", ({ participants }) => {
             console.log("Group: Already in room:", participants);
             participants.forEach(targetId => {
-                // Only initiate if my ID is "smaller" than yours
                 if (socket.id < targetId) {
                     initiateConnection(targetId);
                 }
@@ -53,7 +48,6 @@ export default function GroupCall() {
 
         socket.on("user-joined-room", ({ from }) => {
             console.log("Group: Peer joined:", from);
-            // Only initiate if my ID is "smaller" than yours
             if (socket.id < from) {
                 initiateConnection(from);
             }
@@ -170,56 +164,57 @@ export default function GroupCall() {
     }, [roomId, navigate]);
 
     return (
-        <div className="h-screen bg-neutral-950 p-6 flex flex-col text-white">
-            <div className="flex justify-between items-center mb-6">
+        <div className="h-screen bg-neutral-950 p-4 sm:p-6 flex flex-col text-white overflow-hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold">Group Call Center</h2>
-                    <p className="text-neutral-500 text-sm">Room: <span className="text-blue-400 font-mono">{roomId}</span></p>
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <Users className="w-6 h-6 text-indigo-400" />
+                        Group Call Center
+                    </h2>
+                    <p className="text-neutral-500 text-sm mt-1">Room ID: <span className="text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded">{roomId}</span></p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex w-full sm:w-auto gap-3">
                     <button
                         onClick={() => { navigator.clipboard.writeText(roomId); alert("ID Copied"); }}
-                        className="bg-neutral-800 px-4 py-2 rounded-xl text-sm hover:bg-neutral-700 transition-all"
+                        className="flex-1 sm:flex-none bg-neutral-800 px-4 py-3 rounded-xl text-sm hover:bg-neutral-700 transition-all flex items-center justify-center gap-2 font-bold"
                     >
+                        <Copy className="w-4 h-4" />
                         Copy ID
                     </button>
                     <button
                         onClick={() => navigate("/users")}
-                        className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl font-bold transition-all shadow-lg"
+                        className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
                     >
+                        <PhoneOff className="w-4 h-4" />
                         Leave
                     </button>
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-                <div className="relative bg-neutral-900 rounded-3xl overflow-hidden border-2 border-blue-500/30">
-                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover mirror" />
-                    <div className="absolute bottom-4 left-4 bg-black/40 px-3 py-1 rounded text-xs font-bold uppercase tracking-widest text-white/70 italic">You (Host)</div>
-                </div>
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr min-h-0">
+                <VideoTile
+                    stream={localStream}
+                    name="You (Host)"
+                    isLocal={true}
+                    className="w-full h-full object-cover"
+                />
 
                 {Object.entries(peers).map(([id, peer]) => (
-                    <div key={id} className="relative bg-neutral-900 rounded-3xl overflow-hidden border border-white/5 shadow-xl">
-                        <VideoElement stream={peer.stream} />
-                        <div className="absolute bottom-4 left-4 bg-black/40 px-3 py-1 rounded text-xs font-bold uppercase tracking-widest text-white/70 italic">Participant</div>
-                    </div>
+                    <VideoTile
+                        key={id}
+                        stream={peer.stream}
+                        name={`Participant ${id.substring(0, 4)}`}
+                        className="w-full h-full object-cover"
+                    />
                 ))}
 
                 {Object.keys(peers).length === 0 && (
-                    <div className="col-span-full py-20 text-center flex flex-col items-center justify-center opacity-30">
-                        <div className="text-6xl mb-4">🏠</div>
+                    <div className="col-span-full py-20 text-center flex flex-col items-center justify-center opacity-30 border-2 border-dashed border-white/10 rounded-3xl">
+                        <div className="text-6xl mb-4 grayscale opacity-50">🏠</div>
                         <p className="text-xl font-semibold italic">Sharing is caring. Send your room ID to others.</p>
                     </div>
                 )}
             </div>
         </div>
     );
-}
-
-function VideoElement({ stream }) {
-    const ref = useRef();
-    useEffect(() => {
-        if (ref.current) ref.current.srcObject = stream;
-    }, [stream]);
-    return <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />;
 }

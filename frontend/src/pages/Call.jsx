@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Wifi, WifiOff, Loader2 } from "lucide-react";
 import { socket } from "../socket.js";
+import VideoTile from "../components/video/VideoTile";
+import ControlBar from "../components/video/ControlBar";
 
 export default function Call() {
   const { id } = useParams();
@@ -9,10 +13,14 @@ export default function Call() {
   const remoteRef = useRef(null);
   const pc = useRef(null);
   const streamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isCalling, setIsCalling] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [remoteStream, setRemoteStream] = useState(null);
 
   const handleExit = () => {
     stopMedia();
@@ -28,8 +36,6 @@ export default function Call() {
       });
       streamRef.current = null;
     }
-    if (localRef.current) localRef.current.srcObject = null;
-    if (remoteRef.current) remoteRef.current.srcObject = null;
   };
 
   useEffect(() => {
@@ -59,24 +65,16 @@ export default function Call() {
           urls: "turn:openrelay.metered.ca:80",
           username: "openrelayproject",
           credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject"
         }
       ],
     });
 
     pc.current.ontrack = (e) => {
-      if (remoteRef.current && mounted) {
-        remoteRef.current.srcObject = e.streams[0];
+      if (mounted) {
+        setRemoteStream(e.streams[0]);
+        remoteStreamRef.current = e.streams[0];
         setIsCalling(false);
+        setIsConnected(true);
       }
     };
 
@@ -125,7 +123,6 @@ export default function Call() {
           return;
         }
         streamRef.current = stream;
-        if (localRef.current) localRef.current.srcObject = stream;
         stream.getTracks().forEach((t) => pc.current.addTrack(t, stream));
         if (socket.id < id) startCall();
       })
@@ -171,82 +168,88 @@ export default function Call() {
   };
 
   return (
-    <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden text-white">
-      {/* Background Ambience */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/30 rounded-full blur-[120px]"></div>
+    <div className="h-screen bg-slate-950 flex flex-col text-white overflow-hidden relative">
+      {/* Status Bar */}
+      <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-3 px-4 py-2 glass-dark rounded-2xl pointer-events-auto">
+          {isConnected ? (
+            <Wifi className="h-4 w-4 text-emerald-400" />
+          ) : (
+            <WifiOff className="h-4 w-4 text-red-400 animate-pulse" />
+          )}
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-300">
+            {isConnected ? "Connected" : "Reconnecting..."}
+          </span>
+        </div>
+
+        <div className="px-4 py-2 glass-dark rounded-2xl pointer-events-auto flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-300">
+            Live
+          </span>
+        </div>
       </div>
 
-      <div className="w-full h-full relative z-10">
-        <video
-          ref={remoteRef}
-          autoPlay
-          playsInline
-          className={`w-full h-full object-cover transition-opacity duration-1000 ${isCalling ? 'opacity-0' : 'opacity-100'}`}
-        />
+      {/* Main Video Arena */}
+      <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8">
+        <AnimatePresence>
+          {isCalling ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-8 text-center"
+            >
+              <div className="relative">
+                <div className="absolute inset-0 bg-indigo-500/20 blur-[60px] rounded-full animate-pulse" />
+                <Loader2 className="h-24 w-24 text-indigo-500 animate-spin relative z-10" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold">Calling...</h2>
+                <p className="text-slate-400">Waiting for {id} to join the secure session</p>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="w-full h-full max-w-7xl relative mx-auto flex items-center justify-center">
+              {/* Remote Video (Primary) */}
+              <VideoTile
+                stream={remoteStream}
+                name={`User ${id.substring(0, 4)}`}
+                className="w-full h-full object-contain max-h-[80vh] sm:max-h-full"
+              />
 
-        {isCalling && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md">
-            <div className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
-            <p className="mt-10 text-2xl font-black tracking-tight animate-pulse text-indigo-400">
-              Securing Connection...
-            </p>
-          </div>
-        )}
-
-        {/* Local Preview - Pinned Top Right */}
-        <div className="absolute top-8 right-8 w-56 h-36 md:w-72 md:h-48 rounded-3xl overflow-hidden border-2 border-white/10 shadow-2xl glass transition-all hover:scale-105 group">
-          <video
-            ref={localRef}
-            autoPlay
-            muted
-            playsInline
-            className={`w-full h-full object-cover mirror ${isVideoOff ? 'hidden' : ''}`}
-          />
-          {isVideoOff && (
-            <div className="w-full h-full bg-slate-800 flex items-center justify-center text-4xl">
-              👤
+              {/* Local Video (PiP) */}
+              <motion.div
+                drag
+                dragConstraints={{ left: -100, right: 100, top: -100, bottom: 100 }}
+                className="absolute bottom-24 right-4 w-32 h-24 sm:w-72 sm:h-48 z-10 cursor-move sm:bottom-8 sm:right-8"
+              >
+                <VideoTile
+                  isLocal
+                  stream={streamRef.current}
+                  name="You"
+                  isMuted={isMuted}
+                  isVideoOff={isVideoOff}
+                  className="ring-2 ring-white/20 shadow-2xl"
+                />
+              </motion.div>
             </div>
           )}
-          <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest border border-white/10">
-            You {isMuted && '• Muted'}
-          </div>
-        </div>
-
-        {/* Control Bar - Centered Bottom */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-6 px-10 py-5 glass-dark rounded-[2.5rem] border border-white/10 shadow-2xl">
-          <button
-            onClick={toggleMic}
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'}`}
-          >
-            {isMuted ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 3l18 18" /></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-            )}
-          </button>
-
-          <button
-            onClick={toggleVideo}
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'}`}
-          >
-            {isVideoOff ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 3l18 18" /></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-            )}
-          </button>
-
-          <div className="w-[1px] h-10 bg-white/10 mx-2"></div>
-
-          <button
-            onClick={handleExit}
-            className="w-16 h-16 bg-red-600 hover:bg-red-700 text-white rounded-[1.5rem] shadow-2xl shadow-red-900/40 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 rotate-[135deg]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" /></svg>
-          </button>
-        </div>
+        </AnimatePresence>
       </div>
+
+      {/* Controls Overlay */}
+      <ControlBar
+        isMuted={isMuted}
+        onToggleMic={toggleMic}
+        isVideoOff={isVideoOff}
+        onToggleVideo={toggleVideo}
+        onEndCall={handleExit}
+        isSharing={isSharing}
+        onToggleShare={() => setIsSharing(!isSharing)}
+        onToggleParticipants={() => { }}
+        onToggleChat={() => { }}
+      />
     </div>
   );
 }
